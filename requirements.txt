@@ -1,0 +1,4 @@
+pymupdf
+Pillow
+anthropic[bedrock]
+python-dotenv
