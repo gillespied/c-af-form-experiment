@@ -1,0 +1,33 @@
+{
+    "name": "extract_form_questions",
+    "description": "Extract the questions from an image of a form",
+    "input_schema": {
+        "type": "object",
+        "required": [
+            "pages"
+        ],
+        "properties": {
+            "pages": {
+                "type": "array",
+                "description": "An array of the questions in the form. A question typically consists of a question title, some optional hint text and one or more form fields. Form fields typically look like boxes.",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "question_text"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "number",
+                            "description": "The number of the question. If the questions in the image don't have numbers, number them sequentially, starting at 1."
+                        },
+                        "question_text": {
+                            "type": "string",
+                            "description": "The title of the question. Questions titles are often bigger or bolder than the surrounding text."
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
