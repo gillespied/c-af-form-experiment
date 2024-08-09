@@ -1,35 +1,22 @@
 import asyncio
 import base64
 import io
-import json
 import logging
 import pickle
-
-# import random
 import time
-
-# from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, List
 
-import boto3
-
-# import botocore
 import pandas as pd
 from anthropic import AsyncAnthropicBedrock, RateLimitError
-from anthropic.types.message import Message
-
-# from anthropic.types.tool_use_block import ToolUseBlock
-from dotenv import load_dotenv
 from pdf2image import convert_from_path
 from pdf2image.exceptions import PDFPageCountError
 from PIL import Image
 from PIL.Image import DecompressionBombError
 from tqdm.asyncio import tqdm
+from traitlets import Bool
 
-# from tqdm.notebook import tqdm as tqdm_notebook
-
-base_prompt = """
+BASE_PROMPT = """
 Is this a form? Answer Yes or No. 
 It's only a form if it contains form field boxes.
 Hand drawn forms, questionnaires and surveys are all valid forms.
@@ -38,7 +25,7 @@ If there is no output, explain why.
 """
 
 
-async def test_client(client):
+async def test_client(client: AsyncAnthropicBedrock) -> Bool:
     response = await client.messages.create(
         model="anthropic.claude-3-5-sonnet-20240620-v1:0",
         temperature=0.01,
@@ -50,14 +37,6 @@ async def test_client(client):
 
 
 def get_all_files(folder_path: str) -> List[Path]:
-    """Recursive file list
-
-    Args:
-        folder_path (str): location to be crawled
-
-    Returns:
-        List[Path]: A list of paths for all files in `folder_path`
-    """
     return list(Path(folder_path).glob("**/*"))
 
 
@@ -72,10 +51,6 @@ def load_batch_results(results_file: str) -> Dict[str, Dict]:
 def save_batch_results(results: Dict[str, Dict], results_file: str):
     with open(results_file, "wb") as f:
         pickle.dump(results, f)
-
-
-def get_all_files(folder_path: str) -> List[Path]:
-    return list(Path(folder_path).glob("**/*"))
 
 
 def pdf_to_image_bytes(pdf_path: Path, width: int = 600, dpi: int = 300):
@@ -133,7 +108,7 @@ def format_messages(image_bytes):
             },
         }
         for img in image_bytes
-    ] + [{"type": "text", "text": base_prompt}]
+    ] + [{"type": "text", "text": BASE_PROMPT}]
     return messages
 
 
@@ -223,7 +198,10 @@ async def process_form(
 
 
 async def process_batch(
-    batch: List[Path], semaphore: asyncio.Semaphore, client, extraction_tool
+    batch: List[Path],
+    semaphore: asyncio.Semaphore,
+    client: AsyncAnthropicBedrock,
+    extraction_tool,
 ) -> Dict[str, Dict]:
     results = {}
     for pdf_path in batch:
@@ -236,16 +214,13 @@ async def process_batch(
 
 
 async def process_forms_in_batches(
-    folder_path: str,
-    client,
+    pdf_files: str,
+    client: AsyncAnthropicBedrock,
     extraction_tool,
     batch_size: int = 10,
     max_concurrent: int = 5,
     results_file: str = "batch_results.pickle",
 ) -> Dict[str, Dict]:
-    all_files = get_all_files(folder_path)
-    pdf_files = [Path(file) for file in all_files if str(file).lower().endswith(".pdf")]
-
     semaphore = asyncio.Semaphore(max_concurrent)
 
     # Load existing results if any
@@ -294,9 +269,17 @@ async def process_forms_in_batches(
     return results
 
 
+def get_list_of_file_paths(folder_path, file_type="pdf"):
+    all_files = get_all_files(folder_path)
+    filtered_files = [
+        Path(file) for file in all_files if str(file).lower().endswith(f".{file_type}")
+    ]
+    return filtered_files
+
+
 def run_form_processing(
-    folder_path: str,
-    client,
+    pdf_files: List[str],
+    client: AsyncAnthropicBedrock,
     extraction_tool,
     batch_size: int = 10,
     max_concurrent: int = 5,
@@ -306,7 +289,7 @@ def run_form_processing(
 
     async def run_async():
         return await process_forms_in_batches(
-            folder_path,
+            pdf_files,
             client,
             extraction_tool,
             batch_size,
